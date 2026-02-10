@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+    --color-white: var(--app-white);
+    --color-black: var(--app-black);
+
+    --color-gray-50: var(--app-gray-50);
+    --color-gray-100: var(--app-gray-100);
+    --color-gray-200: var(--app-gray-200);
+    --color-gray-300: var(--app-gray-300);
+    --color-gray-400: var(--app-gray-400);
+    --color-gray-500: var(--app-gray-500);
+    --color-gray-600: var(--app-gray-600);
+    --color-gray-700: var(--app-gray-700);
+    --color-gray-800: var(--app-gray-800);
+    --color-gray-900: var(--app-gray-900);
+    --color-gray-950: var(--app-gray-950);
+}
+
+:root {
+    /* Light Mode (Default) Palette */
+    --app-white: #ffffff;
+    --app-black: #09090b;
+    /* Zinc 950 */
+
+    --app-gray-50: #fafafa;
+    --app-gray-100: #f4f4f5;
+    --app-gray-200: #e4e4e7;
+    --app-gray-300: #d4d4d8;
+    --app-gray-400: #a1a1aa;
+    --app-gray-500: #71717a;
+    --app-gray-600: #52525b;
+    --app-gray-700: #3f3f46;
+    --app-gray-800: #27272a;
+    --app-gray-900: #18181b;
+    --app-gray-950: #09090b;
+}
+
+:root.dark {
+    /* Dark Mode Palette - Inverted */
+    --app-white: #09090b;
+    /* Zinc 950 (Background becomes dark) */
+    --app-black: #fafafa;
+    /* Zinc 50 (Text becomes light) */
+
+    /* Inverted Gray Scale */
+    --app-gray-50: #18181b;
+    /* Was 900 */
+    --app-gray-100: #27272a;
+    /* Was 800 */
+    --app-gray-200: #3f3f46;
+    /* Was 700 */
+    --app-gray-300: #52525b;
+    /* Was 600 */
+    --app-gray-400: #71717a;
+    /* Was 500 */
+    --app-gray-500: #a1a1aa;
+    /* Was 400 */
+    --app-gray-600: #d4d4d8;
+    /* Was 300 */
+    --app-gray-700: #e4e4e7;
+    /* Was 200 */
+    --app-gray-800: #f4f4f5;
+    /* Was 100 */
+    --app-gray-900: #fafafa;
+    /* Was 50 */
+    --app-gray-950: #ffffff;
+    /* Was White */
+}
+
+body {
+    background-color: var(--app-white);
+    color: var(--app-black);
+}
