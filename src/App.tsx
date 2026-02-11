@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ModalProvider } from './contexts/ModalContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/admin/Dashboard';
 import { EventSetup } from './pages/admin/EventSetup';
@@ -10,7 +11,7 @@ import { ReviewView } from './pages/committee/ReviewView';
 import { AdminEventLayout } from './layouts/AdminEventLayout';
 import { Roster } from './pages/admin/Roster';
 import { Judges } from './pages/admin/Judges';
-import { Committee } from './pages/admin/Committee';
+
 import { Results } from './pages/admin/Results';
 import React from 'react';
 
@@ -50,7 +51,7 @@ function AppRoutes() {
                 <Route path="setup" element={<EventSetup />} />
                 <Route path="roster" element={<Roster />} />
                 <Route path="judges" element={<Judges />} />
-                <Route path="committee" element={<Committee />} />
+
                 <Route path="control" element={<ControlRoom />} />
                 <Route path="results" element={<Results />} />
                 <Route path="*" element={<Navigate to="/admin/event/:eventId/setup" />} />
@@ -97,7 +98,9 @@ function App() {
     <Router>
       <AuthProvider>
         <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-          <AppRoutes />
+          <ModalProvider>
+            <AppRoutes />
+          </ModalProvider>
         </ThemeProvider>
       </AuthProvider>
     </Router>

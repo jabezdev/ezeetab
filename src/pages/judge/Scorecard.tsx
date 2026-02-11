@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../../services/firebase';
-import { ref, onValue, update, push } from 'firebase/database';
+import { ref, onValue, update, push, onDisconnect, set } from 'firebase/database';
 import { Button } from '../../components/common/Button';
 import { Lock, CheckCircle, Menu, MessageSquare, Unlock, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 import type { Candidate, Segment, TieBreakerState } from '../../types';
+import { useModal } from '../../contexts/ModalContext';
 
 export const Scorecard: React.FC = () => {
+    const { showAlert, showConfirm } = useModal();
     // Auth State
     const [judgeId] = useState<string | null>(() => localStorage.getItem('tabulate_userId'));
     const [eventId] = useState<string | null>(() => localStorage.getItem('tabulate_eventId'));
@@ -56,10 +58,31 @@ export const Scorecard: React.FC = () => {
             setJudgeName(s.val() || 'Judge');
         });
 
+        // Presence System
+        const connectedRef = ref(db, '.info/connected');
+        const judgeStatusRef = ref(db, `events/${eventId}/judges/${judgeId}/status`);
+        const judgeLastSeenRef = ref(db, `events/${eventId}/judges/${judgeId}/lastSeen`);
+
+        onValue(connectedRef, (snap) => {
+            if (snap.val() === true) {
+                // We're connected (or reconnected)!
+
+                // When I disconnect, update the status to offline
+                onDisconnect(judgeStatusRef).set('offline');
+                onDisconnect(judgeLastSeenRef).set(Date.now());
+
+                // Set status to online
+                set(judgeStatusRef, 'online');
+            } else {
+                // Client is offline (handled by onDisconnect on server side usually, 
+                // but this block runs if client loses internet)
+            }
+        });
+
         // Ping Listener - could enable a toast here
         onValue(ref(db, `events/${eventId}/pings/${judgeId}`), s => {
             if (s.exists() && Date.now() - s.val() < 10000) {
-                alert("Admin is requesting your attention!");
+                showAlert("Admin is requesting your attention!", { title: 'Attention' });
             }
         });
 
@@ -200,11 +223,12 @@ export const Scorecard: React.FC = () => {
         if (!segment?.criteria) return;
         const missing = Object.keys(segment.criteria).some(id => scores[id] === undefined);
         if (missing) {
-            alert('Please score all criteria before submitting.');
+            showAlert('Please score all criteria before submitting.');
             return;
         }
 
-        if (confirm('Lock in scores? You will not be able to edit them.')) {
+        const confirmed = await showConfirm('Lock in scores? You will not be able to edit them.', { confirmLabel: 'Lock In' });
+        if (confirmed) {
             await update(ref(db, `events/${eventId}/scores/${activeSegmentId}/${selectedCandidateId}/${judgeId}`), {
                 criteriaScores: scores,
                 notes: notes,
@@ -217,7 +241,8 @@ export const Scorecard: React.FC = () => {
     };
 
     const requestUnlock = async () => {
-        if (confirm('Request admin to unlock this score?')) {
+        const confirmed = await showConfirm('Request admin to unlock this score?');
+        if (confirmed) {
             await push(ref(db, `events/${eventId}/state/unlockRequests`), {
                 judgeId,
                 candidateId: selectedCandidateId,
@@ -231,11 +256,12 @@ export const Scorecard: React.FC = () => {
 
     const submitTieVote = async () => {
         if (!selectedTieCandidate || !tieBreaker) return;
-        if (confirm(`Vote for candidate #${candidates.find(c => c.id === selectedTieCandidate)?.number}?`)) {
+        const confirmed = await showConfirm(`Vote for candidate #${candidates.find(c => c.id === selectedTieCandidate)?.number}?`, { confirmLabel: 'Vote' });
+        if (confirmed) {
             await update(ref(db, `events/${eventId}/state/tieBreaker/votes`), {
                 [judgeId!]: selectedTieCandidate
             });
-            alert("Vote submitted!");
+            showAlert("Vote submitted!", { title: 'Success' });
         }
     };
 

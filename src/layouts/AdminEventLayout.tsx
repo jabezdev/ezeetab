@@ -6,7 +6,7 @@ import {
     Settings,
     Users,
     Gavel,
-    ShieldCheck,
+
     MonitorPlay,
     Trophy,
 
@@ -35,8 +35,7 @@ export const AdminEventLayout: React.FC = () => {
     const navItems = [
         { icon: Settings, label: 'Event Setup', path: 'setup' },
         { icon: Users, label: 'Roster', path: 'roster' },
-        { icon: Gavel, label: 'Judges', path: 'judges' },
-        { icon: ShieldCheck, label: 'Committee', path: 'committee' },
+        { icon: Gavel, label: 'Judges & Committee', path: 'judges' },
         { icon: MonitorPlay, label: 'Control Room', path: 'control' },
         { icon: Trophy, label: 'Results', path: 'results' },
     ];

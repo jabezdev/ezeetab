@@ -5,6 +5,7 @@ import { db } from '../../services/firebase';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { AdminLayout } from '../../components/layout/AdminLayout';
+import { useModal } from '../../contexts/ModalContext';
 import { Save, Plus, Trash2, GripVertical, AlertCircle, CheckCircle } from 'lucide-react';
 import {
     DndContext,
@@ -196,6 +197,7 @@ const SortableSegmentItem = ({
 };
 
 export const EventSetup: React.FC = () => {
+    const { showAlert, showConfirm } = useModal();
     const { eventId } = useParams();
 
     // Event Details State
@@ -269,8 +271,9 @@ export const EventSetup: React.FC = () => {
         setSegments([...segments, newSegment]);
     };
 
-    const deleteSegment = (id: string) => {
-        if (confirm('Delete this segment?')) {
+    const deleteSegment = async (id: string) => {
+        const confirmed = await showConfirm('Delete this segment?', { destructive: true, confirmLabel: 'Delete' });
+        if (confirmed) {
             setSegments(segments.filter(s => s.id !== id));
         }
     };

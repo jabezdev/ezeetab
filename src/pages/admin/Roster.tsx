@@ -4,7 +4,9 @@ import { ref, onValue, update } from 'firebase/database';
 import { db } from '../../services/firebase';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Plus, Trash2, Image as ImageIcon, Save, Upload, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Image as ImageIcon, Save, Upload, GripVertical, Users } from 'lucide-react';
+import { AdminLayout } from '../../components/layout/AdminLayout';
+import { useModal } from '../../contexts/ModalContext';
 import {
     DndContext,
     closestCenter,
@@ -44,6 +46,8 @@ const CandidateCard = ({
     isOverlay = false,
     dragListeners,
     dragAttributes,
+    showPrompt,
+    showConfirm
 }: {
     candidate: Candidate;
     index: number;
@@ -52,6 +56,8 @@ const CandidateCard = ({
     isOverlay?: boolean;
     dragListeners?: any;
     dragAttributes?: any;
+    showPrompt?: (message: string, options?: any) => Promise<string | null>;
+    showConfirm?: (message: string, options?: any) => Promise<boolean>;
 }) => {
     return (
         <div className={clsx(
@@ -75,11 +81,15 @@ const CandidateCard = ({
                 </div>
 
                 {/* Delete Button */}
-                {deleteCandidate && (
+                {deleteCandidate && showConfirm && (
                     <Button
                         variant="danger"
                         size="sm"
-                        onClick={(e) => { e.stopPropagation(); deleteCandidate(candidate.id); }}
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            const confirmed = await showConfirm('Delete this candidate?', { destructive: true, confirmLabel: 'Delete' });
+                            if (confirmed) deleteCandidate(candidate.id);
+                        }}
                         className="w-8 h-8 p-0 flex items-center justify-center rounded-full bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-300 hover:text-red-500 border-transparent transition-all"
                     >
                         <Trash2 size={16} />
@@ -99,10 +109,10 @@ const CandidateCard = ({
                 )}
 
                 {/* Image Upload Overlay */}
-                {updateCandidate && (
+                {updateCandidate && showPrompt && (
                     <div className="absolute inset-0 bg-indigo-900/20 opacity-0 group-hover/image:opacity-100 flex items-center justify-center transition-all z-20 cursor-pointer backdrop-blur-[1px]"
-                        onClick={() => {
-                            const url = prompt("Enter image URL:", candidate.photoUrl);
+                        onClick={async () => {
+                            const url = await showPrompt("Enter image URL:", { defaultValue: candidate.photoUrl });
                             if (url !== null) updateCandidate(candidate.id, 'photoUrl', url);
                         }}
                     >
@@ -151,11 +161,15 @@ const SortableCandidateItem = ({
     updateCandidate,
     deleteCandidate,
     index,
+    showPrompt,
+    showConfirm
 }: {
     candidate: Candidate;
     updateCandidate: (id: string, field: keyof Candidate, value: string | number) => void;
-    deleteCandidate: (id: string) => void;
+    deleteCandidate?: (id: string) => void;
     index: number;
+    showPrompt: (message: string, options?: any) => Promise<string | null>;
+    showConfirm: (message: string, options?: any) => Promise<boolean>;
 }) => {
     const {
         attributes,
@@ -183,12 +197,15 @@ const SortableCandidateItem = ({
                 deleteCandidate={deleteCandidate}
                 dragListeners={listeners}
                 dragAttributes={attributes}
+                showPrompt={showPrompt}
+                showConfirm={showConfirm}
             />
         </div>
     );
 };
 
 export const Roster: React.FC = () => {
+    const { showPrompt, showConfirm, showAlert } = useModal();
     const { eventId } = useParams();
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [loading, setLoading] = useState(true);
@@ -258,11 +275,13 @@ export const Roster: React.FC = () => {
         setHasChanges(true);
     };
 
+    // Note: Confirmation involves UI interaction now handled in the component calling this,
+    // or we can keep it here if we pass the ID.
+    // However, CandidateCard specifically handles the async confirm now.
+    // So this function should just do the deletion.
     const deleteCandidate = (id: string) => {
-        if (confirm('Delete this candidate?')) {
-            setCandidates(candidates.filter(c => c.id !== id));
-            setHasChanges(true);
-        }
+        setCandidates(prev => prev.filter(c => c.id !== id));
+        setHasChanges(true);
     };
 
     const saveAll = async () => {
@@ -288,7 +307,7 @@ export const Roster: React.FC = () => {
             setHasChanges(false);
         } catch (error) {
             console.error("Failed to save", error);
-            alert("Failed to save changes.");
+            showAlert("Failed to save changes.");
         } finally {
             setIsSaving(false);
         }
@@ -299,81 +318,87 @@ export const Roster: React.FC = () => {
     if (loading) return <div>Loading...</div>;
 
     return (
-        <div className="w-full min-h-full p-8">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight">Candidate Roster</h1>
-                    <p className="text-gray-500 font-medium">Manage and reorder candidates.</p>
-                </div>
-
-                <div className="flex gap-3">
-                    <Button onClick={addCandidate} className="flex items-center gap-2 shadow-lg shadow-blue-200/50 dark:shadow-none bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-indigo-100 dark:border-indigo-900">
-                        <Plus size={18} /> Add Candidate
-                    </Button>
+        <AdminLayout
+            title="Candidate Roster"
+            backPath="/admin/dashboard"
+            actions={
+                hasChanges && (
                     <Button
                         onClick={saveAll}
+                        disabled={isSaving}
                         className={clsx(
-                            "flex items-center gap-2 shadow-xl transition-all",
-                            hasChanges
-                                ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 dark:shadow-none"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700 shadow-none hover:bg-gray-200 dark:hover:bg-gray-700"
+                            "flex items-center gap-2 transition-all",
+                            "bg-green-600 hover:bg-green-700 text-white shadow-sm"
                         )}
-                        disabled={!hasChanges || isSaving}
                     >
-                        {isSaving ? "Saving..." : <><Save size={18} /> {hasChanges ? "Save Changes" : "Saved"}</>}
+                        {isSaving ? "Saving..." : <><Save size={18} /> Save Changes</>}
+                    </Button>
+                )
+            }
+        >
+            <div className="space-y-6">
+                <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+                    <h2 className="text-lg font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                        <Users size={20} className="text-indigo-600 dark:text-indigo-400" />
+                        Candidates ({candidates.length})
+                    </h2>
+                    <Button onClick={addCandidate} size="sm" className="bg-indigo-600 text-white hover:bg-indigo-700">
+                        <Plus size={16} /> Add Candidate
                     </Button>
                 </div>
-            </div>
 
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-            >
-                <SortableContext
-                    items={candidates.map(c => c.id)}
-                    strategy={rectSortingStrategy}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
                 >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-                        {candidates.map((candidate, index) => (
-                            <SortableCandidateItem
-                                key={candidate.id}
-                                candidate={candidate}
-                                index={index}
-                                updateCandidate={updateCandidate}
-                                deleteCandidate={deleteCandidate}
-                            />
-                        ))}
-                    </div>
-                </SortableContext>
-
-                <DragOverlay>
-                    {activeCandidate ? (
-                        <div className="w-64 h-auto"> {/* Fixed width for drag preview if needed, or matched dims */}
-                            <CandidateCard
-                                candidate={activeCandidate}
-                                index={candidates.findIndex(c => c.id === activeCandidate.id)}
-                                isOverlay
-                            />
+                    <SortableContext
+                        items={candidates.map(c => c.id)}
+                        strategy={rectSortingStrategy}
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+                            {candidates.map((candidate, index) => (
+                                <SortableCandidateItem
+                                    key={candidate.id}
+                                    candidate={candidate}
+                                    index={index}
+                                    updateCandidate={updateCandidate}
+                                    deleteCandidate={deleteCandidate}
+                                    showPrompt={showPrompt}
+                                    showConfirm={showConfirm}
+                                />
+                            ))}
                         </div>
-                    ) : null}
-                </DragOverlay>
-            </DndContext>
+                    </SortableContext>
 
-            {candidates.length === 0 && (
-                <div className="text-center py-24 bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300 dark:border-gray-700 mt-6">
-                    <div className="mb-4 text-indigo-200 dark:text-indigo-900">
-                        <ImageIcon size={64} className="mx-auto" />
+                    <DragOverlay>
+                        {activeCandidate ? (
+                            <div className="w-64 h-auto"> {/* Fixed width for drag preview if needed, or matched dims */}
+                                <CandidateCard
+                                    candidate={activeCandidate}
+                                    index={candidates.findIndex(c => c.id === activeCandidate.id)}
+                                    isOverlay
+                                />
+                            </div>
+                        ) : null}
+                    </DragOverlay>
+                </DndContext>
+
+                {candidates.length === 0 && (
+                    <div className="text-center py-24 bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300 dark:border-gray-700 mt-6">
+                        <div className="mb-4 text-indigo-200 dark:text-indigo-900">
+                            <ImageIcon size={64} className="mx-auto" />
+                        </div>
+                        <p className="text-gray-500 font-bold text-xl">No candidates yet</p>
+                        <p className="text-gray-400 text-sm mb-6 max-w-sm mx-auto">Start building your roster by adding candidates. They will appear here in a grid.</p>
+                        <Button variant="secondary" onClick={addCandidate}>
+                            Add First Candidate
+                        </Button>
                     </div>
-                    <p className="text-gray-500 font-bold text-xl">No candidates yet</p>
-                    <p className="text-gray-400 text-sm mb-6 max-w-sm mx-auto">Start building your roster by adding candidates. They will appear here in a grid.</p>
-                    <Button variant="secondary" onClick={addCandidate}>
-                        Add First Candidate
-                    </Button>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+        </AdminLayout>
     );
 };
 
