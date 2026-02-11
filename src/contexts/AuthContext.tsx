@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User, signInAnonymously } from 'firebase/auth';
 import { auth, db } from '../services/firebase';
 import { ref, get } from 'firebase/database';
 
@@ -31,17 +31,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                // Assume admin if authenticated via standard Firebase Auth for now
-                // In a real app, we'd check a user profile in DB
-                setRole('admin');
+                if (currentUser.isAnonymous) {
+                    // If anonymous, check localStorage for role or keep as is (waiting for code login to set it)
+                    const storedRole = localStorage.getItem('tabulate_role') as UserRole;
+                    if (storedRole) setRole(storedRole);
+                    // Do NOT set as admin automatically
+                } else {
+                    // Standard auth is assumed to be admin for now in this app's context
+                    setRole('admin');
+                }
             } else {
-                // Check for session storage or local storage for judges/committee 
-                // since they might not be "authenticated" in the traditional Firebase sense 
-                // if we are using custom auth or anonymous auth with claims.
-                // For MVP, if not admin, maybe we reset role.
-                const storedRole = localStorage.getItem('tabulate_role') as UserRole;
-                if (storedRole) setRole(storedRole);
-                else setRole(null);
+                // No user, check if we have stored role/data but need to re-auth? 
+                // Actually if no user, we are logged out.
+                // But for a persistent judge session that might have expired? 
+                // We rely on Firebase persistence. If that is gone, they need to re-login.
+                setRole(null);
             }
             setLoading(false);
         });
@@ -53,6 +57,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const loginWithCode = async (code: string) => {
+        // Ensure we have a firebase session (anonymous) to read DB if rules require auth
+        if (!auth.currentUser) {
+            await signInAnonymously(auth);
+        }
+
         // Real implementation requires DB lookup
         const codeRef = ref(db, `codes/${code}`);
         const snapshot = await get(codeRef);
@@ -62,25 +71,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('tabulate_user_data', JSON.stringify(data));
             localStorage.setItem('tabulate_role', data.role);
             localStorage.setItem('tabulate_eventId', data.eventId);
-
-            // The code object might have 'id' or we might rely on the code itself as ID if not present?
-            // Usually invalid without an ID. We should ensure 'id' is in the code object.
-            // If not, use the code as ID? No, the code object in DB should point to a judgeId.
-            // Let's assume data has { eventId, role, id? }. 
-            // If the code is for a judge, we need the judgeId.
-            // Based on previous generation: `codes/${code}` -> { eventId, role } (maybe missing ID?)
-
-            // Re-visiting Committee/Judges creation:
-            // await update(ref(db, `codes/${code}`), { eventId, role: 'committee' });
-            // It seems we missed adding the 'userId' or 'memberId' to the code map!
-
-            // CRITICAL FIX: We need to update the creation logic too, but for now let's hope we can recover or fix `loginWithCode` to look up the user if needed.
-            // Actually, if we look at `Judges.tsx` or `Committee.tsx` in previous turns:
-            // await update(ref(db, `codes/${newCode}`), { eventId, role: 'committee' });
-            // The ID wasn't stored in the code map! This is a bug.
-
-            // Workaround: If ID is missing in code map, we have to find the user in the event who has this code.
-            // This is slow (scan). 
 
             let userId = data.id;
             if (!userId) {
@@ -104,6 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setRole(data.role as UserRole);
             return data.role; // Return role for redirect
         } else {
+            // accessible even if anonymous auth failed? likely not if rules enforce it.
+            // If code is invalid, maybe sign out the anonymous user to clean up? 
+            // Optional/Trade-off.
             throw new Error('Invalid Access Code');
         }
     };
@@ -123,3 +116,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         </AuthContext.Provider>
     );
 };
+
