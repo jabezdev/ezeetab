@@ -36,39 +36,14 @@
     --app-gray-950: #09090b;
 }
 
-:root.dark {
-    /* Dark Mode Palette - Inverted */
-    --app-white: #09090b;
-    /* Zinc 950 (Background becomes dark) */
-    --app-black: #fafafa;
-    /* Zinc 50 (Text becomes light) */
 
-    /* Inverted Gray Scale */
-    --app-gray-50: #18181b;
-    /* Was 900 */
-    --app-gray-100: #27272a;
-    /* Was 800 */
-    --app-gray-200: #3f3f46;
-    /* Was 700 */
-    --app-gray-300: #52525b;
-    /* Was 600 */
-    --app-gray-400: #71717a;
-    /* Was 500 */
-    --app-gray-500: #a1a1aa;
-    /* Was 400 */
-    --app-gray-600: #d4d4d8;
-    /* Was 300 */
-    --app-gray-700: #e4e4e7;
-    /* Was 200 */
-    --app-gray-800: #f4f4f5;
-    /* Was 100 */
-    --app-gray-900: #fafafa;
-    /* Was 50 */
-    --app-gray-950: #ffffff;
-    /* Was White */
-}
 
 body {
     background-color: var(--app-white);
     color: var(--app-black);
+}
+
+:is(.dark body) {
+    background-color: var(--app-gray-950);
+    color: var(--app-gray-50);
 }

@@ -5,6 +5,7 @@ import { db } from '../../services/firebase';
 import { calculateLeaderboard } from '../../utils/calculator';
 import { Trophy, Download } from 'lucide-react';
 import { Button } from '../../components/common/Button';
+import { AdminLayout } from '../../components/layout/AdminLayout';
 
 export const Results: React.FC = () => {
     const { eventId } = useParams();
@@ -73,15 +74,17 @@ export const Results: React.FC = () => {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-8">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold flex items-center gap-2">
+        <AdminLayout
+            title={
+                <span className="flex items-center gap-2">
                     <Trophy className="text-yellow-500" /> Results & Leaderboard
-                </h1>
-
-                <div className="flex gap-4">
+                </span>
+            }
+            backPath="/admin/dashboard"
+            actions={
+                <div className="flex gap-3">
                     <select
-                        className="rounded-lg border border-gray-300 px-4 py-2"
+                        className="rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm"
                         value={selectedSegment}
                         onChange={(e) => setSelectedSegment(e.target.value)}
                     >
@@ -92,48 +95,48 @@ export const Results: React.FC = () => {
                         <Download size={18} /> Export CSV
                     </Button>
                 </div>
-            </div>
-
-            <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white">
-                    <div className="grid grid-cols-12 gap-4 font-bold uppercase tracking-wider text-sm">
-                        <div className="col-span-2 text-center">Rank</div>
-                        <div className="col-span-2 text-center">#</div>
-                        <div className="col-span-6">Candidate</div>
+            }
+        >
+            <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div className="bg-gray-50 dark:bg-gray-950/50 p-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="grid grid-cols-12 gap-4 font-bold uppercase tracking-wider text-xs text-gray-500 dark:text-gray-400">
+                        <div className="col-span-1 text-center">Rank</div>
+                        <div className="col-span-1 text-center">#</div>
+                        <div className="col-span-8">Candidate</div>
                         <div className="col-span-2 text-right">Total Score</div>
                     </div>
                 </div>
 
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
                     {leaderboard.map((entry, idx) => (
-                        <div key={entry.id} className={`grid grid-cols-12 gap-4 p-6 items-center hover:bg-gray-50 transition-colors ${idx < 3 ? 'bg-yellow-50/30' : ''}`}>
-                            <div className="col-span-2 flex justify-center">
-                                <span className={`w-8 h-8 flex items-center justify-center rounded-full font-bold ${entry.rank === 1 ? 'bg-yellow-100 text-yellow-700' :
-                                        entry.rank === 2 ? 'bg-gray-200 text-gray-700' :
-                                            entry.rank === 3 ? 'bg-orange-100 text-orange-800' : 'text-gray-500'
+                        <div key={entry.id} className={`grid grid-cols-12 gap-4 p-4 items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${idx < 3 ? 'bg-yellow-50/50 dark:bg-yellow-900/10' : ''}`}>
+                            <div className="col-span-1 flex justify-center">
+                                <span className={`w-6 h-6 flex items-center justify-center rounded text-xs font-bold ${entry.rank === 1 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400' :
+                                    entry.rank === 2 ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                                        entry.rank === 3 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-400' : 'text-gray-400 dark:text-gray-500'
                                     }`}>
                                     {entry.rank}
                                 </span>
                             </div>
-                            <div className="col-span-2 text-center font-mono font-bold text-gray-600 text-lg">
+                            <div className="col-span-1 text-center font-mono font-medium text-gray-500 dark:text-gray-400">
                                 {entry.number}
                             </div>
-                            <div className="col-span-6">
-                                <div className="font-bold text-gray-900 text-lg">{entry.name}</div>
-                                {entry.details && <div className="text-sm text-gray-500">{entry.details}</div>}
+                            <div className="col-span-8">
+                                <div className="font-bold text-gray-900 dark:text-white">{entry.name}</div>
+                                {entry.details && <div className="text-xs text-gray-500 dark:text-gray-400">{entry.details}</div>}
                             </div>
-                            <div className="col-span-2 text-right font-mono font-bold text-2xl text-blue-600">
+                            <div className="col-span-2 text-right font-mono font-bold text-lg text-blue-600 dark:text-blue-400">
                                 {entry.totalScore.toFixed(2)}
                             </div>
                         </div>
                     ))}
                     {leaderboard.length === 0 && (
-                        <div className="p-12 text-center text-gray-400">
+                        <div className="p-12 text-center text-gray-400 dark:text-gray-600 text-sm">
                             No scores available for this segment yet.
                         </div>
                     )}
                 </div>
             </div>
-        </div>
+        </AdminLayout>
     );
 };

@@ -66,37 +66,37 @@ export const Committee: React.FC = () => {
     };
 
     return (
-        <div className="max-w-5xl mx-auto p-8">
+        <div className="max-w-5xl mx-auto p-8 min-h-full">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">Certification Committee</h1>
-                <Button onClick={addMember} className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold dark:text-white">Certification Committee</h1>
+                <Button onClick={addMember} className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700">
                     <Plus size={18} /> Add Member
                 </Button>
             </div>
 
-            <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-100">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Access Code</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Access Code</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {members.map(member => (
                             <tr key={member.id}>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <Input
                                         value={member.name}
                                         onChange={(e) => updateName(member.id, e.target.value)}
-                                        className="border-none shadow-none focus:ring-0 p-0 font-medium"
+                                        className="border-none shadow-none focus:ring-0 p-0 font-medium bg-transparent dark:text-white"
                                     />
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center gap-2">
-                                        <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono tracking-wide">{member.accessCode}</code>
+                                        <code className="bg-gray-100 dark:bg-gray-700 dark:text-gray-200 px-2 py-1 rounded text-sm font-mono tracking-wide">{member.accessCode}</code>
                                         <button onClick={() => copyCode(member.accessCode)} className="text-gray-400 hover:text-blue-500" title="Copy">
                                             <Copy size={16} />
                                         </button>
@@ -106,7 +106,7 @@ export const Committee: React.FC = () => {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${member.status === 'online' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${member.status === 'online' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                         }`}>
                                         {member.status || 'offline'}
                                     </span>

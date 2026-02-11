@@ -133,11 +133,11 @@ export const Judges: React.FC = () => {
     };
 
     return (
-        <div className="max-w-5xl mx-auto p-8">
+        <div className="max-w-5xl mx-auto p-8 min-h-full">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight">Judges Management</h1>
                 <div className="flex items-center gap-3">
-                    <Button onClick={addJudge} className="flex items-center gap-2 shadow-lg shadow-blue-200/50">
+                    <Button onClick={addJudge} className="flex items-center gap-2 shadow-lg shadow-blue-200/50 dark:shadow-none bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-indigo-100 dark:border-indigo-900">
                         <Plus size={18} /> Add Judge
                     </Button>
                     {hasChanges && (
@@ -157,40 +157,40 @@ export const Judges: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {judges.map(judge => (
-                    <div key={judge.id} className="group relative rounded-2xl overflow-hidden border border-white/40 bg-white/60 backdrop-blur-xl shadow-sm hover:shadow-lg transition-all p-5 space-y-4">
+                    <div key={judge.id} className="group relative rounded-2xl overflow-hidden border border-white/40 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl shadow-sm hover:shadow-lg transition-all p-5 space-y-4">
                         <div className="flex justify-between items-start">
                             <div className="flex-1">
                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Name</label>
                                 <Input
                                     value={judge.name}
                                     onChange={(e) => updateName(judge.id, e.target.value)}
-                                    className="bg-transparent border-transparent hover:border-gray-200 focus:bg-white focus:ring-2 focus:ring-indigo-100 font-bold text-lg p-1 -ml-1"
+                                    className="bg-transparent border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:bg-white dark:focus:bg-gray-700 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 font-bold text-lg p-1 -ml-1 text-gray-800 dark:text-white"
                                     placeholder="Judge Name"
                                 />
                             </div>
-                            <button onClick={() => deleteJudge(judge.id)} className="text-gray-300 hover:text-red-500 transition-colors bg-white/50 p-2 rounded-full hover:bg-red-50">
+                            <button onClick={() => deleteJudge(judge.id)} className="text-gray-300 hover:text-red-500 transition-colors bg-white/50 dark:bg-gray-700/50 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30">
                                 <Trash2 size={16} />
                             </button>
                         </div>
 
                         <div>
                             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 block">Access Code</label>
-                            <div className="flex items-center gap-2 bg-gray-50/50 p-2 rounded-lg border border-gray-100 group-hover:bg-white transition-colors">
-                                <code className="flex-1 font-mono text-xl font-black text-indigo-600 tracking-wider text-center select-all cursor-pointer" onClick={() => copyCode(judge.accessCode)}>
+                            <div className="flex items-center gap-2 bg-gray-50/50 dark:bg-gray-900/50 p-2 rounded-lg border border-gray-100 dark:border-gray-700 group-hover:bg-white dark:group-hover:bg-gray-700 transition-colors">
+                                <code className="flex-1 font-mono text-xl font-black text-indigo-600 dark:text-indigo-400 tracking-wider text-center select-all cursor-pointer" onClick={() => copyCode(judge.accessCode)}>
                                     {judge.accessCode}
                                 </code>
                                 <div className="flex flex-col gap-1">
                                     <button onClick={() => copyCode(judge.accessCode)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded" title="Copy">
                                         <Copy size={14} />
                                     </button>
-                                    <button onClick={() => regenerateCode(judge.id)} className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded" title="Regenerate">
+                                    <button onClick={() => regenerateCode(judge.id)} className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded" title="Regenerate">
                                         <RefreshCw size={14} />
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100/50">
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100/50 dark:border-gray-700/50">
                             <div className="flex items-center gap-2">
                                 <span className={clsx(
                                     "w-2 h-2 rounded-full",
@@ -206,7 +206,7 @@ export const Judges: React.FC = () => {
                 ))}
 
                 {judges.length === 0 && (
-                    <div className="col-span-full text-center py-16 bg-white/20 backdrop-blur-sm rounded-2xl border-2 border-dashed border-gray-300">
+                    <div className="col-span-full text-center py-16 bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700">
                         <p className="text-gray-500 font-medium">No judges added yet.</p>
                         <Button variant="secondary" onClick={addJudge} className="mt-4">
                             Add your first judge

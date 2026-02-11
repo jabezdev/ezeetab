@@ -8,7 +8,6 @@ import { ControlRoom } from './pages/admin/ControlRoom';
 import { Scorecard } from './pages/judge/Scorecard';
 import { ReviewView } from './pages/committee/ReviewView';
 import { AdminEventLayout } from './layouts/AdminEventLayout';
-import { Segments } from './pages/admin/Segments';
 import { Roster } from './pages/admin/Roster';
 import { Judges } from './pages/admin/Judges';
 import { Committee } from './pages/admin/Committee';
@@ -49,7 +48,6 @@ function AppRoutes() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="event/:eventId/*" element={<AdminEventLayout />}>
                 <Route path="setup" element={<EventSetup />} />
-                <Route path="segments" element={<Segments />} />
                 <Route path="roster" element={<Roster />} />
                 <Route path="judges" element={<Judges />} />
                 <Route path="committee" element={<Committee />} />
