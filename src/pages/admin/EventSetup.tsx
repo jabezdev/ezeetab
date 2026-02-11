@@ -197,7 +197,7 @@ const SortableSegmentItem = ({
 };
 
 export const EventSetup: React.FC = () => {
-    const { showAlert, showConfirm } = useModal();
+    const { showConfirm } = useModal();
     const { eventId } = useParams();
 
     // Event Details State
