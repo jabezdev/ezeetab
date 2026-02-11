@@ -9,9 +9,12 @@ interface AdminLayoutProps {
     children: React.ReactNode;
     backPath?: string;
     fullWidth?: boolean;
+    hideSidebar?: boolean;
 }
 
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ title, actions, children, backPath, fullWidth = true }) => {
+export const AdminLayout: React.FC<AdminLayoutProps> = ({ title, actions, children, backPath, fullWidth = true, hideSidebar }) => {
+    // Suppress unused warning if not implemented yet
+    void hideSidebar;
     const navigate = useNavigate();
 
     return (

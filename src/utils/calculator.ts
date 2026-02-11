@@ -15,9 +15,11 @@ export interface CandidateScore {
     rank: number;
 }
 
+import type { JudgeScore } from '../types';
+
 export const calculateCandidateScore = (
     _candidateId: string,
-    judgeScores: { [judgeId: string]: ScoreData } | undefined,
+    judgeScores: { [judgeId: string]: ScoreData | JudgeScore } | undefined,
     criteria: { [id: string]: { weight?: number, maxScore: number } }
 ): number => {
     if (!judgeScores || !criteria) return 0;

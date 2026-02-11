@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../../services/firebase';
 import { ref, onValue, update, push, onDisconnect, set } from 'firebase/database';
 import { Button } from '../../components/common/Button';
-import { Lock, CheckCircle, MessageSquare, Unlock, AlertTriangle, User, Star } from 'lucide-react';
+import { Lock, CheckCircle, Unlock, AlertTriangle, User, Star } from 'lucide-react';
 import clsx from 'clsx';
 import type { Candidate, Segment, TieBreakerState } from '../../types';
 import { useModal } from '../../contexts/ModalContext';
@@ -324,7 +324,7 @@ export const Scorecard: React.FC = () => {
     return (
         <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
             {/* Top Bar: Segments */}
-            <div className="bg-gray-900 text-white shadow-md z-20 flex-shrink-0">
+            <div className="bg-gray-900 text-white shadow-md z-20 shrink-0">
                 <div className="flex items-center">
                     <div className="px-6 py-4 border-r border-gray-800 flex items-center gap-3">
                         <div className="bg-indigo-600 rounded-lg p-2">
@@ -443,7 +443,7 @@ export const Scorecard: React.FC = () => {
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-gray-300"><User size={96} /></div>
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent opacity-80" />
+                                <div className="absolute inset-0 bg-linear-to-t from-gray-900/80 via-transparent to-transparent opacity-80" />
 
                                 <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
                                     <h1 className="text-7xl font-black tracking-tighter mb-2">#{selectedCandidate.number}</h1>

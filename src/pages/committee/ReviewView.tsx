@@ -5,7 +5,7 @@ import { CheckCircle, Clock, Wifi, Bell, Unlock, Gavel } from 'lucide-react';
 import { calculateCandidateScore } from '../../utils/calculator';
 import { AdminLayout } from '../../components/layout/AdminLayout';
 import clsx from 'clsx';
-import type { Segment, Candidate, Judge, UnlockRequest, TieBreakerState, Score } from '../../types';
+import type { Segment, Candidate, Judge, UnlockRequest, TieBreakerState, JudgeScore } from '../../types';
 
 export const ReviewView: React.FC = () => {
     // Auth & Route
@@ -21,7 +21,7 @@ export const ReviewView: React.FC = () => {
     const [segments, setSegments] = useState<Segment[]>([]);
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [judges, setJudges] = useState<Judge[]>([]);
-    const [scores, setScores] = useState<Record<string, Record<string, Score>>>({});
+    const [scores, setScores] = useState<Record<string, Record<string, JudgeScore>>>({});
     const [unlockRequests, setUnlockRequests] = useState<Record<string, UnlockRequest>>({});
     const [tieBreaker, setTieBreaker] = useState<TieBreakerState | null>(null);
 
@@ -115,7 +115,7 @@ export const ReviewView: React.FC = () => {
 
             // Calculate total based on criteria
             if (currentSegment.criteria) {
-                total = calculateCandidateScore(candidate.id, scores, currentSegment.criteria);
+                total = calculateCandidateScore(candidate.id, cScores, currentSegment.criteria);
             }
 
             // Judge Specific Data for this candidate
