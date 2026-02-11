@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../../services/firebase';
 import { ref, onValue, update, push, onDisconnect, set } from 'firebase/database';
 import { Button } from '../../components/common/Button';
-import { Lock, CheckCircle, Menu, MessageSquare, Unlock, AlertTriangle } from 'lucide-react';
+import { Lock, CheckCircle, MessageSquare, Unlock, AlertTriangle, User, Star } from 'lucide-react';
 import clsx from 'clsx';
 import type { Candidate, Segment, TieBreakerState } from '../../types';
 import { useModal } from '../../contexts/ModalContext';
@@ -21,21 +21,22 @@ export const Scorecard: React.FC = () => {
 
     // Data
     const [candidates, setCandidates] = useState<Candidate[]>([]);
-    const [segment, setSegment] = useState<Segment | null>(null);
+    const [segments, setSegments] = useState<Segment[]>([]);
 
-    // Selection State (Judge can browse, but defaults to active)
+    // Scores State (All scores for this judge in the active segment)
+    const [judgeScores, setJudgeScores] = useState<Record<string, any>>({}); // candidateId -> scoreData
+
+    // Selection State
     const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
-    const [showRoster, setShowRoster] = useState(false);
 
     // Scoring State for Selected Candidate
-    const [scores, setScores] = useState<{ [key: string]: number }>({});
+    const [currentScores, setCurrentScores] = useState<{ [key: string]: number }>({});
     const [notes, setNotes] = useState<string>('');
     const [isLocked, setIsLocked] = useState(false);
     const [unlockRequested, setUnlockRequested] = useState(false);
 
     // Tie Breaker State
     const [selectedTieCandidate, setSelectedTieCandidate] = useState<string | null>(null);
-
 
     const [online, setOnline] = useState(navigator.onLine);
 
@@ -65,27 +66,18 @@ export const Scorecard: React.FC = () => {
 
         onValue(connectedRef, (snap) => {
             if (snap.val() === true) {
-                // We're connected (or reconnected)!
-
-                // When I disconnect, update the status to offline
                 onDisconnect(judgeStatusRef).set('offline');
                 onDisconnect(judgeLastSeenRef).set(Date.now());
-
-                // Set status to online
                 set(judgeStatusRef, 'online');
-            } else {
-                // Client is offline (handled by onDisconnect on server side usually, 
-                // but this block runs if client loses internet)
             }
         });
 
-        // Ping Listener - could enable a toast here
+        // Ping Listener
         onValue(ref(db, `events/${eventId}/pings/${judgeId}`), s => {
             if (s.exists() && Date.now() - s.val() < 10000) {
                 showAlert("Admin is requesting your attention!", { title: 'Attention' });
             }
         });
-
 
         return () => {
             window.removeEventListener('online', handleOnline);
@@ -93,7 +85,7 @@ export const Scorecard: React.FC = () => {
         };
     }, [eventId, judgeId]);
 
-    // Listen to Event State & Candidates
+    // Listen to Event State & Candidates & Segments
     useEffect(() => {
         if (!eventId) return;
 
@@ -101,17 +93,16 @@ export const Scorecard: React.FC = () => {
         onValue(ref(db, `events/${eventId}/state`), (snapshot) => {
             const data = snapshot.val();
             if (data) {
+                // If active candidate changes, we DON'T force switch selection if user is clicking around
+                // But we update the "On Stage" indicator
                 setActiveCandidateId(data.activeCandidateId);
-                setActiveSegmentId(data.activeSegmentId);
-                setTieBreaker(data.tieBreaker || null);
 
-                // If we haven't selected anyone yet, or if the active candidate changes 
-                // and the judge hasn't explicitly navigated away (logic can be complex, 
-                // for MVP let's auto-switch to active if standard flow)
-                // Actually, let's auto-switch only if we are not "locked" on another candidate?
-                // Request says "Judges have the roster... can click around... indicator on who is on stage".
-                // So we shouldn't force switch if they are browsing.
-                // But initially, yes.
+                // If segment changes, we might need to reset view
+                if (data.activeSegmentId !== activeSegmentId) {
+                    setActiveSegmentId(data.activeSegmentId);
+                }
+
+                setTieBreaker(data.tieBreaker || null);
             }
         });
 
@@ -123,48 +114,66 @@ export const Scorecard: React.FC = () => {
             setCandidates(list);
         });
 
+        // Segments
+        onValue(ref(db, `events/${eventId}/segments`), (snapshot) => {
+            const data = snapshot.val();
+            const list = data ? Object.entries(data).map(([k, v]: [string, any]) => ({ id: k, ...v })) : [];
+            list.sort((a, b) => (a.order || 0) - (b.order || 0));
+            setSegments(list);
+        });
+
     }, [eventId]);
 
-    // Set initial selection
+    // Fetch all scores for the active segment to show completion status in grid
+    useEffect(() => {
+        if (!eventId || !activeSegmentId || !judgeId) {
+            setJudgeScores({});
+            return;
+        }
+
+        const segmentScoresRef = ref(db, `events/${eventId}/scores/${activeSegmentId}`);
+        const unsub = onValue(segmentScoresRef, (snapshot) => {
+            const data = snapshot.val(); // { candidateId: { judgeId: { ... } } }
+            const myScores: Record<string, any> = {};
+
+            if (data) {
+                Object.entries(data).forEach(([cId, judgesData]: [string, any]) => {
+                    if (judgesData[judgeId]) {
+                        myScores[cId] = judgesData[judgeId];
+                    }
+                });
+            }
+            setJudgeScores(myScores);
+        });
+
+        return () => unsub();
+    }, [eventId, activeSegmentId, judgeId]);
+
+    // Initial Selection: if nothing selected, select active
     useEffect(() => {
         if (activeCandidateId && !selectedCandidateId) {
             setSelectedCandidateId(activeCandidateId);
         }
     }, [activeCandidateId, selectedCandidateId]);
 
-    // Fetch Segment Criteria
-    useEffect(() => {
-        if (!eventId || !activeSegmentId) {
-            setSegment(null);
-            return;
-        }
-        onValue(ref(db, `events/${eventId}/segments/${activeSegmentId}`), (snapshot) => {
-            setSegment(snapshot.val());
-        });
-    }, [eventId, activeSegmentId]);
-
-    // Fetch Scores for Selected Candidate
+    // When selection changes or segment changes, update local scoring state
     useEffect(() => {
         if (!eventId || !activeSegmentId || !selectedCandidateId || !judgeId) return;
 
-        // Reset local state instantly to avoid flashing previous candidate's data
-        setScores({});
-        setNotes('');
-        setIsLocked(false);
-        setUnlockRequested(false);
+        // If we have the data in judgeScores, use it seamlessly
+        const existingData = judgeScores[selectedCandidateId];
 
-        const scoreRef = ref(db, `events/${eventId}/scores/${activeSegmentId}/${selectedCandidateId}/${judgeId}`);
-        const unsubScore = onValue(scoreRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                setScores(data.criteriaScores || {});
-                setNotes(data.notes || '');
-                setIsLocked(!!data.locked);
-            }
-        });
+        if (existingData) {
+            setCurrentScores(existingData.criteriaScores || {});
+            setNotes(existingData.notes || '');
+            setIsLocked(!!existingData.locked);
+        } else {
+            setCurrentScores({});
+            setNotes('');
+            setIsLocked(false);
+        }
 
-        // check for pending unlock request
-        // We query the unlockRequests collection
+        // Check for pending unlock request
         const reqRef = ref(db, `events/${eventId}/state/unlockRequests`);
         const unsubReq = onValue(reqRef, (snapshot) => {
             const reqs = snapshot.val();
@@ -181,12 +190,10 @@ export const Scorecard: React.FC = () => {
             }
         });
 
-        return () => {
-            unsubScore();
-            unsubReq();
-        }
-    }, [eventId, activeSegmentId, selectedCandidateId, judgeId]);
+        return () => unsubReq();
+    }, [eventId, activeSegmentId, selectedCandidateId, judgeId, judgeScores]);
 
+    // --- Scoring Logic ---
     const handleScoreChange = (criterionId: string, value: string, max: number) => {
         if (isLocked) return;
         let numVal = value === '' ? 0 : parseFloat(value);
@@ -194,15 +201,15 @@ export const Scorecard: React.FC = () => {
         if (numVal < 0) numVal = 0;
         if (numVal > max) numVal = max;
 
-        const newScores = { ...scores, [criterionId]: numVal };
-        setScores(newScores);
+        const newScores = { ...currentScores, [criterionId]: numVal };
+        setCurrentScores(newScores);
         debouncedSave(newScores, notes);
     };
 
     const handleNotesChange = (val: string) => {
         if (isLocked) return;
         setNotes(val);
-        debouncedSave(scores, val);
+        debouncedSave(currentScores, val);
     }
 
     const debouncedSave = (s: any, n: string) => {
@@ -220,8 +227,10 @@ export const Scorecard: React.FC = () => {
     };
 
     const submitScores = async () => {
+        const segment = segments.find(s => s.id === activeSegmentId);
         if (!segment?.criteria) return;
-        const missing = Object.keys(segment.criteria).some(id => scores[id] === undefined);
+
+        const missing = Object.keys(segment.criteria).some(id => currentScores[id] === undefined);
         if (missing) {
             showAlert('Please score all criteria before submitting.');
             return;
@@ -230,9 +239,9 @@ export const Scorecard: React.FC = () => {
         const confirmed = await showConfirm('Lock in scores? You will not be able to edit them.', { confirmLabel: 'Lock In' });
         if (confirmed) {
             await update(ref(db, `events/${eventId}/scores/${activeSegmentId}/${selectedCandidateId}/${judgeId}`), {
-                criteriaScores: scores,
+                criteriaScores: currentScores,
                 notes: notes,
-                total: Object.values(scores).reduce((a: number, b: any) => a + b, 0),
+                total: Object.values(currentScores).reduce((a: number, b: any) => a + b, 0),
                 locked: true,
                 submittedAt: Date.now()
             });
@@ -265,7 +274,8 @@ export const Scorecard: React.FC = () => {
         }
     };
 
-    const activeCandidate = candidates.find(c => c.id === activeCandidateId);
+    // --- Helpers ---
+    const segment = segments.find(s => s.id === activeSegmentId);
     const selectedCandidate = candidates.find(c => c.id === selectedCandidateId);
 
     // Tie Breaker View
@@ -308,198 +318,238 @@ export const Scorecard: React.FC = () => {
     }
 
     if (!activeSegmentId || !segment || !candidates.length) {
-        return <div className="p-8 text-center text-gray-500">Waiting for event to start...</div>;
+        return <div className="h-screen flex items-center justify-center text-gray-500 font-bold bg-gray-50">Waiting for event to start...</div>;
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 flex flex-col relative overflow-hidden">
-            {/* Roster Drawer / Sidebar */}
-            <div
-                className={clsx(
-                    "fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out",
-                    showRoster ? "translate-x-0" : "-translate-x-full"
-                )}
-            >
-                <div className="p-4 bg-gray-900 text-white flex justify-between items-center">
-                    <h2 className="font-bold uppercase tracking-wider">Roster</h2>
-                    <button onClick={() => setShowRoster(false)} className="p-2 hover:bg-gray-800 rounded-full">
-                        <Menu size={20} />
-                    </button>
-                </div>
-                <div className="overflow-y-auto h-full pb-20">
-                    {candidates.map(c => (
-                        <button
-                            key={c.id}
-                            onClick={() => { setSelectedCandidateId(c.id); setShowRoster(false); }}
-                            className={clsx(
-                                "w-full p-4 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors text-left",
-                                selectedCandidateId === c.id && "bg-blue-50 border-l-4 border-blue-500",
-                                activeCandidateId === c.id && !selectedCandidateId && "bg-yellow-50"
-                            )}
-                        >
-                            <div>
-                                <div className="text-xs text-gray-400 font-bold uppercase">#{c.number}</div>
-                                <div className="font-bold text-gray-800">{c.name}</div>
-                            </div>
-                            {activeCandidateId === c.id && (
-                                <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold uppercase rounded-full animate-pulse">
-                                    On Stage
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Overlay for Roster */}
-            {showRoster && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
-                    onClick={() => setShowRoster(false)}
-                />
-            )}
-
-            {/* Header */}
-            <div className={clsx("bg-gray-900 text-white p-4 shadow-md sticky top-0 z-30 transition-colors", !online && "bg-red-800")}>
-                <div className="max-w-3xl mx-auto flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => setShowRoster(true)} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
-                            <Menu size={24} />
-                        </button>
+        <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+            {/* Top Bar: Segments */}
+            <div className="bg-gray-900 text-white shadow-md z-20 flex-shrink-0">
+                <div className="flex items-center">
+                    <div className="px-6 py-4 border-r border-gray-800 flex items-center gap-3">
+                        <div className="bg-indigo-600 rounded-lg p-2">
+                            <Star size={20} className="text-white fill-current" />
+                        </div>
                         <div>
-                            <div className="text-xs opacity-75 uppercase tracking-wider">{segment.name}</div>
-                            <div className="font-bold text-lg">{judgeName}</div>
+                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider">Judge</div>
+                            <div className="font-bold leading-none">{judgeName}</div>
                         </div>
                     </div>
 
-                    <div className="text-right">
-                        {activeCandidateId && activeCandidateId !== selectedCandidateId && (
-                            <button
-                                onClick={() => setSelectedCandidateId(activeCandidateId)}
-                                className="text-xs font-bold text-yellow-400 hover:text-yellow-300 mr-2 uppercase animate-pulse"
-                            >
-                                Live Now: #{activeCandidate?.number}
-                            </button>
-                        )}
+                    <div className="flex-1 overflow-x-auto flex items-center no-scrollbar">
+                        {segments.map(s => {
+                            const isActive = s.id === activeSegmentId;
+                            return (
+                                <div
+                                    key={s.id}
+                                    className={clsx(
+                                        "px-6 py-4 text-sm font-bold uppercase tracking-wider whitespace-nowrap transition-colors border-r border-gray-800",
+                                        isActive ? "bg-indigo-900 text-white" : "text-gray-500 bg-gray-900"
+                                    )}
+                                >
+                                    {isActive && <span className="mr-2 text-indigo-400">●</span>}
+                                    {s.name}
+                                </div>
+                            );
+                        })}
                     </div>
+
+                    {!online && (
+                        <div className="px-4 py-2 bg-red-600 text-white text-xs font-bold animate-pulse">
+                            OFFLINE
+                        </div>
+                    )}
                 </div>
-                {!online && <div className="text-center text-xs font-bold bg-red-900 p-1 mt-2 rounded">OFFLINE MODE - Queued Updates</div>}
             </div>
 
-            <div className="flex-1 max-w-2xl mx-auto w-full p-4 space-y-6 pb-32">
-                {selectedCandidate ? (
-                    <>
-                        {/* Candidate Info Card */}
-                        <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col items-center text-center relative overflow-hidden">
-                            {/* Indicator if this is NOT the active candidate */}
-                            {activeCandidateId !== selectedCandidateId && (
-                                <div className="absolute top-0 w-full bg-gray-200 text-gray-600 text-xs font-bold py-1 uppercase tracking-widest">
-                                    Reviewing
-                                </div>
-                            )}
-                            <h1 className="text-4xl font-black text-gray-900 mb-1 mt-2">#{selectedCandidate.number}</h1>
-                            <h2 className="text-2xl font-bold text-gray-700">{selectedCandidate.name}</h2>
-                            <p className="text-gray-500">{selectedCandidate.details}</p>
-                        </div>
+            {/* Main Layout: 3 Columns */}
+            <div className="flex-1 flex overflow-hidden">
 
-                        {/* Scoring Form */}
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                            <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                                <h3 className="font-bold text-gray-700">Scorecard</h3>
-                                {isLocked && <Lock size={16} className="text-gray-400" />}
-                            </div>
+                {/* COL 1: Roster Grid (40%) */}
+                <div className="w-[40%] bg-gray-100 border-r border-gray-200 overflow-y-auto p-4 z-10">
+                    <div className="grid grid-cols-3 gap-3">
+                        {candidates.map(c => {
+                            const isSelected = selectedCandidateId === c.id;
+                            const isOnStage = activeCandidateId === c.id;
+                            const hasScore = judgeScores[c.id];
+                            const isLocked = hasScore?.locked;
 
-                            <div className="p-6 space-y-8">
-                                {segment.criteria && Object.entries(segment.criteria).map(([cId, crit]: [string, any]) => (
-                                    <div key={cId} className="space-y-2">
-                                        <div className="flex justify-between items-end">
-                                            <label className="font-medium text-gray-700">{crit.name}</label>
-                                            <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                                                Max: {crit.maxScore}
+                            return (
+                                <button
+                                    key={c.id}
+                                    onClick={() => setSelectedCandidateId(c.id)}
+                                    className={clsx(
+                                        "relative group rounded-lg overflow-hidden shadow-sm transition-all text-left flex flex-col bg-white",
+                                        isSelected
+                                            ? "ring-2 ring-indigo-500 z-10 scale-[1.02] shadow-md"
+                                            : "hover:shadow hover:scale-[1.02]",
+                                        isLocked
+                                            ? "border border-green-200"
+                                            : "border border-gray-200"
+                                    )}
+                                >
+                                    {/* Image Thumbnail */}
+                                    <div className="aspect-square bg-gray-200 relative overflow-hidden">
+                                        {c.photoUrl ? (
+                                            <img src={c.photoUrl} alt={c.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
+                                                <User size={32} />
+                                            </div>
+                                        )}
+
+                                        {/* Number Badge */}
+                                        <div className="absolute top-1 left-1">
+                                            <span className="bg-gray-900/80 text-white px-1.5 py-0.5 rounded text-[10px] font-black">
+                                                #{c.number}
                                             </span>
                                         </div>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                disabled={isLocked}
-                                                value={scores[cId] === undefined ? '' : scores[cId]}
-                                                onChange={(e) => handleScoreChange(cId, e.target.value, crit.maxScore)}
-                                                className={clsx(
-                                                    "w-full text-3xl font-bold p-4 rounded-lg border-2 text-center transition-all focus:outline-none focus:ring-4",
-                                                    isLocked
-                                                        ? "bg-gray-50 border-gray-200 text-gray-500"
-                                                        : "border-blue-100 focus:border-blue-500 focus:ring-blue-100 text-blue-900"
-                                                )}
-                                                placeholder="0"
-                                            />
+
+                                        {isOnStage && (
+                                            <div className="absolute top-1 right-1">
+                                                <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold uppercase animate-pulse shadow-sm">
+                                                    Live
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {isLocked && (
+                                            <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center backdrop-blur-[1px]">
+                                                <div className="bg-green-500 text-white rounded-full p-1 shadow-sm">
+                                                    <CheckCircle size={16} strokeWidth={3} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="p-2">
+                                        <div className="font-bold text-gray-900 text-xs truncate leading-tight">{c.name}</div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* COL 2: Image & Details (40%) */}
+                <div className="w-[40%] bg-white border-r border-gray-200 relative flex flex-col">
+                    {selectedCandidate ? (
+                        <>
+                            {/* Candidate Image Top */}
+                            <div className="flex-1 bg-gray-100 relative overflow-hidden group">
+                                {selectedCandidate.photoUrl ? (
+                                    <img src={selectedCandidate.photoUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-300"><User size={96} /></div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent opacity-80" />
+
+                                <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                                    <h1 className="text-7xl font-black tracking-tighter mb-2">#{selectedCandidate.number}</h1>
+                                    <h2 className="text-4xl font-bold leading-tight">{selectedCandidate.name}</h2>
+                                </div>
+                            </div>
+
+                            {/* Scrollable Details Bottom */}
+                            <div className="h-1/3 p-8 bg-white overflow-y-auto">
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 border-b pb-2">Candidate Profile</h3>
+                                <p className="text-lg text-gray-600 leading-relaxed">
+                                    {selectedCandidate.details}
+                                </p>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex items-center justify-center w-full h-full text-gray-300 flex-col gap-4">
+                            <User size={64} className="opacity-50" />
+                            <p>Select Candidate</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* COL 3: Criteria & Scoring (20%) */}
+                <div className="w-[20%] bg-gray-50 flex flex-col overflow-hidden shadow-inner font-mono z-20">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div className="pb-4 border-b border-gray-200">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Scoring</h3>
+                            <div className="font-bold text-indigo-600">{segment.name}</div>
+                        </div>
+
+                        {selectedCandidate ? (
+                            <div className="space-y-6">
+                                {segment.criteria && Object.entries(segment.criteria).map(([cId, crit]: [string, any]) => (
+                                    <div key={cId} className="space-y-1">
+                                        <div className="flex justify-between items-end text-sm">
+                                            <label className="font-bold text-gray-700 leading-tight block w-2/3">{crit.name}</label>
+                                            <span className="text-[10px] font-bold text-gray-400 bg-white px-1.5 py-0.5 rounded border border-gray-200">/{crit.maxScore}</span>
                                         </div>
-                                        {/* range indicator */}
                                         <input
-                                            type="range"
-                                            min="0"
-                                            max={crit.maxScore}
-                                            step="0.1"
+                                            type="number"
                                             disabled={isLocked}
-                                            value={scores[cId] || 0}
+                                            value={currentScores[cId] === undefined ? '' : currentScores[cId]}
                                             onChange={(e) => handleScoreChange(cId, e.target.value, crit.maxScore)}
-                                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                            className={clsx(
+                                                "w-full text-2xl font-black bg-white border outline-none transition-all p-3 rounded-lg text-right shadow-sm",
+                                                isLocked
+                                                    ? "border-gray-200 text-gray-400 bg-gray-50"
+                                                    : "border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-indigo-900"
+                                            )}
+                                            placeholder="0"
                                         />
                                     </div>
                                 ))}
 
-                                <div className="pt-4 border-t border-gray-100">
-                                    <label className="flex items-center gap-2 font-bold text-gray-500 mb-2">
-                                        <MessageSquare size={16} /> Notes
-                                    </label>
+                                <div className="pt-4 border-t border-gray-200">
                                     <textarea
                                         disabled={isLocked}
                                         value={notes}
                                         onChange={(e) => handleNotesChange(e.target.value)}
-                                        placeholder="Add notes..."
-                                        className="w-full p-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 min-h-[100px] text-sm"
+                                        className="w-full p-3 rounded-lg border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all resize-none text-xs min-h-[80px]"
+                                        placeholder="Notes..."
                                     />
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="text-center text-gray-400 text-sm py-12 italic">
+                                Select a candidate to view criteria
+                            </div>
+                        )}
+                    </div>
 
-                        {/* Footer Action */}
-                        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20">
-                            <div className="max-w-2xl mx-auto">
+                    {/* Footer Action */}
+                    <div className="p-4 bg-white border-t border-gray-200">
+                        {selectedCandidate && (
+                            <>
                                 {!isLocked ? (
                                     <Button
                                         onClick={submitScores}
                                         size="lg"
-                                        className="w-full py-4 text-lg shadow-blue-300 shadow-xl"
+                                        className="w-full py-3 text-sm font-bold shadow-lg shadow-indigo-200 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
                                     >
-                                        <Lock size={20} className="mr-2" /> Lock In Scores
+                                        <Lock size={16} className="mr-2" /> Lock In
                                     </Button>
                                 ) : (
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center justify-center gap-2 text-green-600 font-bold bg-green-50 p-2 rounded-lg border border-green-100">
-                                            <CheckCircle size={20} /> Scores Locked
+                                    <div className="space-y-2 w-full">
+                                        <div className="text-center p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 font-bold flex items-center justify-center gap-2 text-xs">
+                                            <CheckCircle size={14} />
+                                            <span>Locked</span>
                                         </div>
                                         {unlockRequested ? (
-                                            <Button disabled variant="secondary" className="w-full opacity-70">
-                                                <Unlock size={18} className="mr-2 animate-pulse" /> Unlock Requested...
+                                            <Button disabled variant="secondary" className="w-full opacity-70 text-xs py-2">
+                                                <Unlock size={12} className="mr-1 animate-pulse" /> Pending...
                                             </Button>
                                         ) : (
-                                            <Button variant="secondary" onClick={requestUnlock} className="w-full">
+                                            <Button variant="ghost" onClick={requestUnlock} className="w-full text-xs text-gray-400 hover:text-gray-600 py-2">
                                                 Request Unlock
                                             </Button>
                                         )}
                                     </div>
                                 )}
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                        <div className="text-6xl mb-4 font-black text-gray-200">?</div>
-                        Select a candidate from the menu
+                            </>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );
 };
-
